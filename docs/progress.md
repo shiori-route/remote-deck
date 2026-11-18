@@ -54,6 +54,19 @@
   [report](reviews/step-03-runner.md). Pre-cancelled jobs now persist an empty log
   without launching a process; new regression test passed independently uncached.
 - Self-review also added parent-directory fsync for new log durability.
+- Commit: `2291961` — allowlisted execution and bounded persistent logs.
 - Risk: process groups do not contain descendants that deliberately escape;
   abrupt service death is still outside the containment guarantee.
 - Next step: integrate the sequential worker after acceptance.
+
+## Step 4 — Sequential worker (accepted)
+
+- Scope: `internal/worker`, progress and review documentation.
+- Acceptance: FIFO serial execution, real uname output after queue reopen,
+  shutdown outcome persistence with queued work retained, unsupported provider
+  rejection, stop immediately on result persistence failure.
+- Checks: full ordinary/race/vet suite PASS with Go 1.27.4/CGO on Debian.
+- Review: independent PASS against `2291961`; [report](reviews/step-04-worker.md).
+- Known limits: no HTTP service yet; restart tests cover queued metadata, not
+  hard-crash containment. A failed/removed provider may have no execution log.
+- Next step: HTTP API, safe service startup, smoke test and CI.
