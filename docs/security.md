@@ -1,6 +1,6 @@
 # Security model
 
-Status: design requirements; see progress for what is implemented.
+Status: first local milestone. See progress for implementation and test evidence.
 
 The first milestone trusts the local OS user and other local processes. Bind
 only to `127.0.0.1`; reject non-loopback bind configuration. Do not proxy this API

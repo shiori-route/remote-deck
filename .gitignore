@@ -29,6 +29,11 @@ go.work.sum
 # env file
 .env
 
+# Local service data and build output
+/data/
+/bin/
+/remotedeck
+
 # Editor/IDE
 # .idea/
 # .vscode/

@@ -1,5 +1,9 @@
 # Development progress
 
+Current status: the first local HTTP vertical slice is implemented, tested and
+independently reviewed. Authentication and a usable browser client are next;
+this service is not ready for remote exposure.
+
 ## Repository baseline
 
 - Commit: `75fb437` (Initial commit).
@@ -82,5 +86,30 @@
 - Full ordinary tests, race and vet PASS. A test-only unused import was fixed
   before the suite passed; no runtime behavior was changed for that correction.
 - Review: independent PASS against `6367a49`; [report](reviews/step-05a-api.md).
+- Commit: `906a6e9` — strict job API and resumable log reads.
 - Known limits: no standalone server yet; no authentication, UI or SSE.
 - Next step: safe service composition, CLI, CI and actual HTTP smoke/restart test.
+
+## Step 5b — Runnable local service (accepted)
+
+- Scope: `cmd/remotedeck`, `internal/service`, CI, gitignore and synchronized docs.
+- Acceptance: loopback-only non-root startup; private storage; exclusive instance
+  lock; shutdown joins server/worker; worker failures stop service; persisted
+  results/logs remain readable after restart; interrupted rows are not retried.
+- Full `go test ./...`, `go test -race ./...`, `go vet ./...` PASS on Debian 13,
+  Go 1.27.4/CGO. Added worker-failure service test also passes ordinary/race/vet.
+- Test harness corrections: temporary service directories explicitly chmod 0700;
+  crash helper arguments follow `--` so Go's test flags do not reject them.
+- Built actual binary and ran HTTP smoke test: submit system-info, succeed with
+  exit 0, retrieve 112 bytes of output, reject a concurrent second instance,
+  stop via SIGTERM, restart and read unchanged status/logs. PASS.
+- SIGKILL helper test: running row becomes failed with unknown outcome, queued
+  row retained, instance lock released. PASS; no task descendant was launched.
+- CI configured for Go 1.25.x and 1.27.x; GitHub-hosted runs not executed here.
+- Review: independent PASS against `906a6e9`; [report](reviews/step-05b-service.md).
+- M1 (Medium) fixed: crash-test readiness now requires a complete valid job ID,
+  avoiding a race between ready-file creation and writing. Targeted race test
+  repeated 5 times PASS; reviewer service tests uncached PASS.
+- Known limits: no auth/UI/SSE/retries/artifacts or general commands; total history
+  retention unbounded; no hard-crash or escaped-descendant containment guarantee.
+- Next planned milestone after acceptance: authentication design and usable client.

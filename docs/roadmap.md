@@ -11,7 +11,7 @@ Do not proceed with unresolved Critical/High findings.
    execution, process groups, deadlines, output cap and lifecycle tests.
 4. **Worker integration**: serial durable polling, shutdown, failure handling,
    queue restart and real execution tests.
-5. **HTTP vertical slice**: strict requests, submission/status/history/logs,
+5. **HTTP vertical slice** (split into reviewed handlers and service composition): strict requests, submission/status/history/logs,
    safe startup and shutdown, instance lock, API integration tests, actual Debian
    smoke test, updated quick start and GitHub Actions. This completes milestone 1.
 6. **Secure usable client**: authentication and threat model, mobile Svelte UI,

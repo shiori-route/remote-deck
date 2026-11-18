@@ -6,9 +6,15 @@ The eventual UI will support desktop and mobile browsers.
 
 ## Development status
 
-Design baseline and persistent queue under development. No executable, API, UI,
-or crash-containment guarantee is available yet. See [progress](docs/progress.md)
-and [roadmap](docs/roadmap.md).
+The first local HTTP vertical slice is implemented: durable submission, sequential
+execution, status/history queries and resumable raw log reads. The only task is
+`system-info` (`/usr/bin/uname -a`). No frontend or remote access yet. See
+[progress](docs/progress.md) and [roadmap](docs/roadmap.md) for review status.
+
+Implemented protections include fixed argv, a minimal environment, task deadlines,
+process-group cleanup, output/queue/request bounds, private storage and a
+single-instance lock. Restart reconciliation records uncertain running jobs as
+failed without rerunning them; it does not guarantee crash containment.
 
 ## MVP architecture
 
@@ -23,25 +29,38 @@ flowchart LR
 ```
 
 The first milestone is HTTP submission → durable queue → execution → durable
-status and logs → HTTP retrieval. A predefined `system-info` task will execute
-`/usr/bin/uname -a` with no client-supplied command, arguments, or directory.
+status and logs → HTTP retrieval. No client-supplied executable, arguments or
+working directory is accepted.
 
 ## Quick start
 
-Not available until the first executable milestone passes tests and code review.
-Build prerequisites: Linux, Go 1.25+ and a C compiler for the approved CGO SQLite
-driver. Nothing should be exposed publicly at this stage.
+Prerequisites: Linux, Go 1.25+ and GCC for the CGO SQLite driver. Tested locally on
+Debian 13 with Go 1.27.4. Run as a non-root user; existing data directories must
+be owned by that user with mode 0700. No system SQLite installation is required.
 
-## Planned API example
-
-```http
-POST /api/v1/jobs
-Content-Type: application/json
-
-{"task_type":"system-info","parameters":{}}
+```sh
+go build -o ./bin/remotedeck ./cmd/remotedeck
+./bin/remotedeck -addr 127.0.0.1:8080 -data-dir ./data
 ```
 
-The response will contain a job ID for querying status and raw logs. See the
+The service creates a missing data directory, listens only on IPv4 loopback and
+writes structured lifecycle logs to stderr. Stop it with Ctrl-C; queued jobs
+remain available on the next start. Do not expose it through a reverse proxy.
+
+## API example
+
+```sh
+curl -sS http://127.0.0.1:8080/api/v1/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"task_type":"system-info","parameters":{}}'
+
+# Replace JOB_ID with data.id from the response.
+curl -sS http://127.0.0.1:8080/api/v1/jobs/JOB_ID
+curl -sS 'http://127.0.0.1:8080/api/v1/jobs/JOB_ID/logs?offset=0&limit=65536'
+curl -sS 'http://127.0.0.1:8080/api/v1/jobs?after=0&limit=20'
+```
+
+Submission returns HTTP 201 and a job ID for querying status and raw logs. See the
 [API contract](docs/api.md) for exact behavior.
 
 ## Security and limitations
@@ -53,6 +72,9 @@ See [security](docs/security.md) and [deployment](docs/deployment.md).
 
 There are no benchmark results or UI screenshots yet. Frontend, authentication,
 SSE, cancellation API, retries, artifacts, and Codex integration are planned.
+Per-job output is capped at 4 MiB, but total history has no retention limit.
+Monitor disk space. Escaped descendants and hard-crash cleanup require future
+systemd/cgroup supervision before general-purpose tasks are enabled.
 
 ## Design and development
 
@@ -63,3 +85,12 @@ SSE, cancellation API, retries, artifacts, and Codex integration are planned.
 
 Each implementation step requires tests, a complete diff review, resolution of
 blocking findings, and a focused commit before the next step begins.
+
+```sh
+go test ./...
+go test -race ./...
+go vet ./...
+```
+
+GitHub Actions is configured for Go 1.25.x and 1.27.x on Linux. Remote CI results
+are not yet available; local verification and review evidence are in progress.md.

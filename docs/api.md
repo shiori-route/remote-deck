@@ -2,8 +2,8 @@
 
 Base path `/api/v1`. JSON responses use `{"data": ...}`; errors use
 `{"error":{"code":"...","message":"..."}}`. Logs are the only binary response.
-Handlers are implemented and integration-tested. A runnable service is the next
-step; see progress for deployment readiness.
+Implemented and integration-tested, with a local runnable service. See progress
+for review status. Remote access and browser UI are not yet supported.
 
 ## Submit a job
 

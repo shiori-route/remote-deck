@@ -1,6 +1,6 @@
 # Architecture baseline
 
-Status: proposed first milestone; implementation status lives in `progress.md`.
+Status: first-milestone implementation exists; review/test status lives in `progress.md`.
 
 ## Components and directories
 
@@ -10,6 +10,7 @@ submission does not depend on a notification being delivered.
 
 ```text
 cmd/remotedeck/       configuration, startup, signals, HTTP lifecycle
+internal/service/    private storage, instance lock, server/worker lifecycle
 internal/job/        job model and state invariants
 internal/store/      SQLite schema and transactional operations
 internal/task/       predefined task definitions and validation
