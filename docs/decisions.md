@@ -8,8 +8,8 @@ Polling adds a small scheduling delay; throughput is not the first priority.
 
 ## D002 — Native SQLite through database/sql
 
-SQLite is required by the project. Proposed driver: `github.com/mattn/go-sqlite3`,
-pending user approval. It requires CGO and a C compiler at build time; the bundled
+SQLite is required by the project. Approved driver: `github.com/mattn/go-sqlite3`
+(user approved 2026-11-18; pinned in go.mod). It requires CGO and a C compiler at build time; the bundled
 SQLite implementation avoids requiring a separately installed SQLite runtime.
 Alternative: `modernc.org/sqlite` removes CGO but adds more Go dependencies.
 Source: [driver documentation](https://github.com/mattn/go-sqlite3).

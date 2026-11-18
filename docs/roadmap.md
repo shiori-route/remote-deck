@@ -6,7 +6,7 @@ Do not proceed with unresolved Critical/High findings.
 1. **Design baseline**: schema, contracts, risks, directory structure and scope.
 2. **Persistent queue**: Go module, model, versioned schema, submission, atomic
    claims/transitions, restart reconciliation and tests including rollback and
-   concurrent callers. Driver approval is required before adding the dependency.
+   concurrent callers. The SQLite driver was approved on 2026-11-18.
 3. **Bounded process execution**: fixed provider, private log storage, direct
    execution, process groups, deadlines, output cap and lifecycle tests.
 4. **Worker integration**: serial durable polling, shutdown, failure handling,

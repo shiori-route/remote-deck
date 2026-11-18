@@ -6,8 +6,9 @@ The eventual UI will support desktop and mobile browsers.
 
 ## Development status
 
-Design baseline only. No executable, API, UI, or crash-recovery guarantee is
-implemented yet. See [progress](docs/progress.md) and [roadmap](docs/roadmap.md).
+Design baseline and persistent queue under development. No executable, API, UI,
+or crash-containment guarantee is available yet. See [progress](docs/progress.md)
+and [roadmap](docs/roadmap.md).
 
 ## MVP architecture
 
@@ -28,8 +29,8 @@ status and logs → HTTP retrieval. A predefined `system-info` task will execute
 ## Quick start
 
 Not available until the first executable milestone passes tests and code review.
-Planned build prerequisites: Linux, Go and a C compiler if the CGO SQLite driver
-is approved. Nothing should be exposed publicly at this stage.
+Build prerequisites: Linux, Go 1.25+ and a C compiler for the approved CGO SQLite
+driver. Nothing should be exposed publicly at this stage.
 
 ## Planned API example
 

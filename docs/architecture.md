@@ -20,7 +20,7 @@ docs/                contracts, decisions, risks, progress and reviews
 ```
 
 Use `net/http`, `database/sql`, `os/exec` and `log/slog`. A SQLite driver is the
-only planned runtime library dependency; selection awaits approval. Avoid a
+only runtime library dependency (`mattn/go-sqlite3`, approved). Avoid a
 generic repository layer. Worker and API use concrete, small storage operations.
 
 ## State and delivery semantics
