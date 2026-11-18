@@ -36,8 +36,24 @@
 - Review: independent PASS against `e8f0913`; [report](reviews/step-02-store.md).
 - Initial test failure: SQLite strings could not scan directly into RawMessage;
   fixed by scanning a string and converting explicitly; all checks rerun.
-- Commit: recorded in the next accepted step to avoid a self-referential hash.
+- Commit: `067f7b9` — transactional SQLite job queue and lifecycle.
 - Known limitations: storage requires a private parent directory and external
   instance ownership; service startup will enforce these in step 5. No runnable
   server exists yet. Reconciliation does not prove old processes have stopped.
 - Next step: bounded process execution after acceptance.
+
+## Step 3 — Bounded process execution (accepted)
+
+- Scope: `internal/task`, `internal/runner`; fixed system-info task, explicit
+  argv/environment, process group cleanup, deadlines, bounded raw logs.
+- Acceptance: real success/nonzero/start failure; byte-preserving combined output;
+  4 MiB cap; environment isolation; timeout/cancellation/descendant cleanup;
+  unsafe IDs/symlink logs rejected; storage failures retained while draining.
+- Tests: full `go test ./...`, `go test -race ./...`, `go vet ./...` PASS.
+- Review: independent PASS after fix/re-review against `067f7b9`;
+  [report](reviews/step-03-runner.md). Pre-cancelled jobs now persist an empty log
+  without launching a process; new regression test passed independently uncached.
+- Self-review also added parent-directory fsync for new log durability.
+- Risk: process groups do not contain descendants that deliberately escape;
+  abrupt service death is still outside the containment guarantee.
+- Next step: integrate the sequential worker after acceptance.
