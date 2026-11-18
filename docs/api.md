@@ -1,8 +1,9 @@
-# API contract (planned)
+# API contract
 
 Base path `/api/v1`. JSON responses use `{"data": ...}`; errors use
 `{"error":{"code":"...","message":"..."}}`. Logs are the only binary response.
-No API is implemented at the design baseline.
+Handlers are implemented and integration-tested. A runnable service is the next
+step; see progress for deployment readiness.
 
 ## Submit a job
 
@@ -13,7 +14,7 @@ No API is implemented at the design baseline.
 ```
 
 Only this task and an empty parameters object are accepted initially. Reject
-unknown fields, non-object or missing parameters, multiple JSON documents and
+unknown/duplicate fields, non-object or missing parameters, multiple JSON documents and
 invalid JSON. Maximum request body: 16 KiB. The server chooses timeout (10 s),
 executable (`/usr/bin/uname`), arguments (`-a`), environment and working directory.
 Client-provided executable, paths or environment are never accepted.
@@ -48,11 +49,13 @@ raw bytes incrementally. Responses must disable caching and MIME sniffing.
 
 ## Errors and access
 
-`400` invalid input; `404` unknown job/route; `405` unsupported method;
+`400` invalid input; `403` forbidden origin/host; `404` unknown job/route; `405` unsupported method;
 `413` body too large; `415` unsupported media type; `429` queue full;
 `500` internal/persistence failure (without internal paths or SQL details).
 The service listens only on IPv4 loopback initially. Reject browser-originated
 requests carrying Origin or nonempty Sec-Fetch-Site headers; no CORS allowance.
+The Host header must be `127.0.0.1` with an optional port to reject DNS rebinding.
+Unknown or duplicate query keys are rejected on history and log endpoints.
 This mitigates browser access but is not authentication. Only trusted local
 processes should have access. A protected browser UI requires a later auth design.
 

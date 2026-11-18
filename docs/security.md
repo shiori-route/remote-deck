@@ -5,7 +5,7 @@ Status: design requirements; see progress for what is implemented.
 The first milestone trusts the local OS user and other local processes. Bind
 only to `127.0.0.1`; reject non-loopback bind configuration. Do not proxy this API
 to a network, including a private network, before authentication is implemented.
-Browser Origin/Fetch Metadata rejection and strict JSON POSTs are additional
+Host validation (`127.0.0.1` only), browser Origin/Fetch Metadata rejection and strict JSON POSTs are additional
 barriers, not a substitute for identity and authorization.
 
 The only initial task is `/usr/bin/uname -a`. Use absolute executable paths,

@@ -67,6 +67,20 @@
   rejection, stop immediately on result persistence failure.
 - Checks: full ordinary/race/vet suite PASS with Go 1.27.4/CGO on Debian.
 - Review: independent PASS against `2291961`; [report](reviews/step-04-worker.md).
+- Commit: `6367a49` — durable queue connected to sequential worker.
 - Known limits: no HTTP service yet; restart tests cover queued metadata, not
   hard-crash containment. A failed/removed provider may have no execution log.
 - Next step: HTTP API, safe service startup, smoke test and CI.
+
+## Step 5a — HTTP handlers (accepted)
+
+- Step 5 split into handlers and service composition to keep reviews focused.
+- Scope: `internal/api`, API/security/progress documentation.
+- Acceptance: strict submission, query pagination, fixed task list, bounded raw
+  logs with resume offsets, consistent errors, path/browser protections,
+  concurrent submissions and real execution through the HTTP handler.
+- Full ordinary tests, race and vet PASS. A test-only unused import was fixed
+  before the suite passed; no runtime behavior was changed for that correction.
+- Review: independent PASS against `6367a49`; [report](reviews/step-05a-api.md).
+- Known limits: no standalone server yet; no authentication, UI or SSE.
+- Next step: safe service composition, CLI, CI and actual HTTP smoke/restart test.
