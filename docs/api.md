@@ -3,20 +3,41 @@
 Base path `/api/v1`. JSON responses use `{"data": ...}`; errors use
 `{"error":{"code":"...","message":"..."}}`. Logs are the only binary response.
 Implemented and integration-tested, with a local runnable service. See progress
-for review status. Remote access and browser UI are not yet supported.
+for review status. The local browser console is served at `/`; remote access is
+not supported.
 
 ## Authentication
 
-All routes require exactly one `Authorization: Bearer <token>` header, including
-job history, details, logs and task-type listing. The auth scheme is case-insensitive.
+Job routes require one `Authorization: Bearer <token>` header or a valid browser
+session cookie, including history, details, logs and task types. The auth scheme
+is case-insensitive. Invalid explicit Authorization never falls back to cookies.
 The service generates a 256-bit random token, encoded as 64 lowercase hex
 characters, in `<data-dir>/auth.token` (0600). It is reused on restart.
 Missing, malformed, duplicate or incorrect credentials return `401` with
 `WWW-Authenticate: Bearer realm="remotedeck"` and error code `unauthorized`.
 No request body or job/log data is read before successful authentication.
-Tokens in URL queries, request bodies or cookies are not accepted.
+Operator tokens in URL queries, request bodies or cookies are not accepted.
 Host/Origin checks still apply, and can return 403 before credential checking.
 This is one operator credential with full API access, not a multi-user role system.
+
+## Browser sessions
+
+- `POST /session`: exact configured Origin and operator bearer header required;
+  no body. Returns 201 with `data.csrf_token` and `data.expires_at`. Sets an opaque
+  `remotedeck_session` cookie: HttpOnly, SameSite=Strict, Path=/api/v1, no Domain,
+  Max-Age=28800. Secure is absent only for this loopback HTTP deployment.
+- `GET /session`: valid session cookie required. Returns its CSRF token and expiry
+  for reload/resume; never returns the session ID or operator token.
+- `DELETE /session`: valid cookie, exact Origin and X-CSRF-Token required. Revokes
+  the server entry, expires the cookie and returns 204.
+
+Cookie-authenticated writes require the exact configured origin, including the
+actual listener port, and one matching X-CSRF-Token header. Missing/invalid CSRF
+returns 403 `csrf_failed`; origin guard failures return 403 `forbidden`. Bearer
+CLI requests do not require CSRF. Reauthentication rotates the current session.
+Sessions have an absolute 8-hour lifetime, are capped at 64 (429 when full), and
+live only in memory. Restart revokes all sessions. Expired entries are reclaimed
+on access/login; no cleanup goroutine is needed.
 
 ## Submit a job
 
@@ -66,12 +87,13 @@ raw bytes incrementally. Responses must disable caching and MIME sniffing.
 `404` unknown job/route; `405` unsupported method;
 `413` body too large; `415` unsupported media type; `429` queue full;
 `500` internal/persistence failure (without internal paths or SQL details).
-The service listens only on IPv4 loopback initially. Reject browser-originated
-requests carrying Origin or nonempty Sec-Fetch-Site headers; no CORS allowance.
-The Host header must be `127.0.0.1` with an optional port to reject DNS rebinding.
+The service listens only on IPv4 loopback. Host must match the actual listener
+address including port. Origin, when present, must exactly match that address.
+API Fetch Metadata, when present, must be `same-origin`; cross-site and same-site
+requests are rejected, and no CORS allowance is added.
 Unknown or duplicate query keys are rejected on history and log endpoints.
-These browser guards supplement bearer authentication. Browser sessions, CSRF
-protection for a UI and remote TLS access require a separate design.
+The public shell/assets contain no job data or credentials. They also permit
+direct navigation (`Sec-Fetch-Site: none`). Remote TLS needs a separate design.
 
 ## Deferred
 

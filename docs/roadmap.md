@@ -14,9 +14,9 @@ Do not proceed with unresolved Critical/High findings.
 5. **HTTP vertical slice** (split into reviewed handlers and service composition): strict requests, submission/status/history/logs,
    safe startup and shutdown, instance lock, API integration tests, actual Debian
    smoke test, updated quick start and GitHub Actions. This completes milestone 1.
-6. **Secure usable client**: single-operator bearer authentication and threat model
-   implemented; next add browser sessions, mobile Svelte UI,
-   protected remote access and deployment instructions. Review dependencies first.
+6. **Secure usable client**: single-operator bearer authentication, browser
+   sessions/CSRF and responsive local Svelte UI implemented. Next design protected
+   HTTPS remote access and deployment. Narrow-screen layout is not remote access.
 7. **Supervised task integration**: first implement systemd/cgroup process
    ownership and pass crash-injection tests proving descendant cleanup and
    restart reconciliation. This is an acceptance gate before registering any

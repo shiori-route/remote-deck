@@ -19,6 +19,7 @@ import (
 	"remotedeck/internal/auth"
 	"remotedeck/internal/runner"
 	"remotedeck/internal/store"
+	"remotedeck/internal/webui"
 	"remotedeck/internal/worker"
 )
 
@@ -149,8 +150,9 @@ func (s *Service) Run(parent context.Context) (result error) {
 	defer func() { result = errors.Join(result, s.Close()) }()
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
-	h := api.Handler{Store: s.db, LogDirectory: s.directory, Logger: s.logger, Auth: s.auth}
-	server := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
+	sessions := auth.NewSessions("http://" + s.Address())
+	h := api.Handler{Store: s.db, LogDirectory: s.directory, Logger: s.logger, Auth: s.auth, Sessions: sessions}
+	server := &http.Server{Handler: webui.Handler(h, s.Address()), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
 	serveDone := make(chan error, 1)
 	workDone := make(chan error, 1)
 	go func() { serveDone <- server.Serve(s.listener) }()

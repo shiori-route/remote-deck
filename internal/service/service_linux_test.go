@@ -158,6 +158,20 @@ func TestActualHTTPServiceAndRestart(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- s.Run(ctx) }()
 	base := "http://" + s.Address()
+	login, err := http.NewRequest(http.MethodPost, base+"/api/v1/session", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	login.Header.Set("Origin", base)
+	loginResponse, err := client.Do(login)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loginResponse.Body.Close()
+	if loginResponse.StatusCode != 201 || len(loginResponse.Cookies()) != 1 {
+		t.Fatal("browser login failed")
+	}
+	oldSession := loginResponse.Cookies()[0]
 	res, e := client.Post(base+"/api/v1/jobs", "application/json", strings.NewReader(`{"task_type":"system-info","parameters":{}}`))
 	if e != nil {
 		t.Fatal(e)
@@ -199,6 +213,20 @@ func TestActualHTTPServiceAndRestart(t *testing.T) {
 	defer cancel()
 	go func() { done <- s.Run(ctx) }()
 	base = "http://" + s.Address()
+	replay, err := http.NewRequest(http.MethodGet, base+"/api/v1/session", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replay.AddCookie(oldSession)
+	plainClient := &http.Client{Timeout: 3 * time.Second}
+	replayed, err := plainClient.Do(replay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayed.Body.Close()
+	if replayed.StatusCode != 401 {
+		t.Fatal("browser session survived service restart")
+	}
 	res, e = client.Get(base + "/api/v1/jobs/" + id + "/logs")
 	if e != nil {
 		t.Fatal(e)

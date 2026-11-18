@@ -31,8 +31,8 @@ ownership with systemd/cgroups is required before unattended general workloads.
 ## D005 — Loopback-only milestone
 
 The first milestone deferred authentication. Mandatory bearer authentication was
-added in D006; loopback-only binding and browser-origin rejection remain until
-browser-session/CSRF/TLS behavior is designed and tested.
+added in D006. D007 permits the same-origin console with sessions/CSRF; loopback
+binding and rejection of other origins remain until remote TLS is designed.
 
 ## D006 — One local operator bearer token
 
@@ -44,4 +44,22 @@ operator. This changes previously anonymous API clients: they must send the head
 
 The token grants full authority and is revoked by offline rotation plus restart.
 It is not a browser login/session solution or a multi-user authorization scheme.
-Keep loopback binding; introduce HTTPS and browser sessions in a later step.
+Keep loopback binding. D007 subsequently adds browser sessions; HTTPS remains future work.
+
+## D007 — Local browser sessions and an embedded Svelte console
+
+Add in-memory opaque sessions, HttpOnly/SameSite cookies, absolute 8-hour expiry
+and per-session CSRF tokens. The login uses the existing operator credential;
+CLI bearer calls remain supported. Session count is bounded, restart revokes all
+sessions, and no database migration is required. Keep exact origin/host guards.
+
+Use Svelte/TypeScript and Vite to build static assets, then embed them in Go.
+Node is a build/test dependency only. Generated output is ignored, so a fresh
+checkout must build web assets before Go tests/build; CI does that explicitly.
+The UI polls bounded existing API endpoints and uses incremental byte decoding.
+General commands, SSE, user accounts and remote TLS remain separate steps.
+
+The current HTTP loopback cookie is not Secure and cookies are not port-isolated.
+This assumes trusted local services; it must not be generalized to a remote or
+multi-user deployment without a dedicated HTTPS-origin design. An unpatched
+picomatch issue in trusted-input build tooling is recorded in security.md.

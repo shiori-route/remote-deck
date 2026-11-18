@@ -1,9 +1,9 @@
 # Development progress
 
-Current status: the first local HTTP vertical slice and mandatory operator bearer
-authentication are implemented and tested. The original slice passed independent
-reviews; the authentication step received a self-review. Browser sessions and a
-usable client are next; this service is not ready for remote exposure.
+Current status: the local HTTP vertical slice, operator bearer authentication,
+browser sessions/CSRF and responsive Svelte console are implemented and tested.
+The original slice passed independent reviews; later authentication/UI steps
+received self-review. Protected remote HTTPS deployment is still future work.
 
 ## Repository baseline
 
@@ -126,6 +126,7 @@ usable client are next; this service is not ready for remote exposure.
 
 ## Step 6a — Mandatory local API authentication
 
+- Commit: `b55c7cf`.
 - Baseline: `43152c2`; continued in the existing `dev` worktree after the workspace
   root moved to its parent. Earlier AGENTS.md instructions were revoked by the
   user; this step uses self-review, not an independent agent review.
@@ -153,3 +154,38 @@ usable client are next; this service is not ready for remote exposure.
   share the service identity/data directory; future providers need isolation design.
 - Next step: browser-session and CSRF design, then a usable client; keep loopback
   binding until protected remote access is designed and tested.
+
+## Step 6b — Local browser sessions and Svelte console
+
+- Baseline: `b55c7cf`; scope: bounded session store, session API and CSRF guards,
+  embedded static serving, Svelte/TypeScript UI, browser tests, CI and docs.
+- Browser login uses the operator token once, then an HttpOnly/SameSite cookie.
+  Sessions expire after 8 hours, cap at 64, rotate on reauthentication, revoke on
+  logout and all disappear on restart. Cookie writes require exact Origin/CSRF.
+- UI: login/logout, system-info submission, paginated history, selected-job
+  details, 1.5-second polling and incremental UTF-8 log reads with a display cap.
+  No operator credential goes into localStorage/sessionStorage. CLI bearer stays
+  supported. No network listener or runtime Node/Vite server was introduced.
+- Validation: npm ci, npm run check (0 errors/warnings), npm run build and npm ls
+  passed; full Go ordinary/race/vet suites and binary build passed on Debian.
+- Chromium E2E: desktop (1365px) and narrow-screen (390px) PASS. Tests cover login
+  failure/success, real uname output, reload session recovery, CSRF/origin refusal,
+  21-job forward/backward pagination, literal HTML log display, split UTF-8
+  boundaries, bounded output, logout replay
+  refusal, no browser credential storage and no horizontal overflow. Screenshots
+  inspected at `/tmp/remotedeck-desktop.png` and `/tmp/remotedeck-mobile.png`.
+- Real service restart test now confirms browser cookies are revoked while bearer
+  access and persisted job/log data remain available.
+- Self-review: PASS for implementation; [report](reviews/step-06b-console.md).
+  Initial Svelte reactivity/accessibility warnings fixed; TypeScript pinned to a
+  compatible version; stale polling 401 cannot clear a newer login generation.
+  Pagination controls stay disabled during refresh to prevent stale-cursor clicks.
+- Dependency audit is NOT clean: six high build-tool entries inherit the unpatched
+  picomatch advisory. Restricted to trusted build patterns here; details and
+  limitations recorded in security.md. No findings were hidden or suppressed.
+- CI now builds frontend assets before Go checks and runs browser tests on Go
+  1.27.x. Remote GitHub Actions has not been executed in this session.
+- Remaining limits: HTTP-only loopback cookies require trusted local services
+  (cookies are not port-isolated), no remote access, no roles, SSE, cancellation
+  UI or general task providers. Go build/test requires generated frontend assets.
+- Next step: design protected HTTPS remote access before enabling network clients.

@@ -28,6 +28,7 @@ type Handler struct {
 	LogDirectory string
 	Logger       *slog.Logger
 	Auth         auth.Verifier
+	Sessions     *auth.Sessions
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,13 +39,16 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		host = parsed
 	}
 	_, origin := r.Header["Origin"]
-	if host != "127.0.0.1" || origin || r.Header.Get("Sec-Fetch-Site") != "" {
+	fetchSite := r.Header.Get("Sec-Fetch-Site")
+	if host != "127.0.0.1" || (origin && !h.Sessions.SameOrigin(r)) || (fetchSite != "" && fetchSite != "same-origin") {
 		apiError(w, 403, "forbidden", "only trusted local clients are supported")
 		return
 	}
-	if !h.Auth.Allows(r.Header.Values("Authorization")) {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="remotedeck"`)
-		apiError(w, http.StatusUnauthorized, "unauthorized", "a valid bearer token is required")
+	if r.URL.Path == "/api/v1/session" {
+		h.session(w, r)
+		return
+	}
+	if !h.authorize(w, r) {
 		return
 	}
 	path := r.URL.Path

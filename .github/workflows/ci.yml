@@ -16,8 +16,25 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run check && npm run build
+        working-directory: web
       - run: test -z "$(gofmt -l cmd internal)"
       - run: go test ./...
       - run: go test -race ./...
       - run: go vet ./...
       - run: go build -o /tmp/remotedeck ./cmd/remotedeck
+      - run: npx playwright install --with-deps chromium
+        if: matrix.go == '1.27.x'
+        working-directory: web
+      - run: npm run test:e2e
+        if: matrix.go == '1.27.x'
+        working-directory: web
+        env:
+          REMOTEDECK_BIN: /tmp/remotedeck

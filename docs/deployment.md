@@ -5,7 +5,18 @@ and local disk. Public or private-network remote deployment is not supported yet
 Do not use network filesystems for the
 SQLite/data directory or share it across hosts.
 
-Build with Go 1.25+ and GCC (`go build -o ./bin/remotedeck ./cmd/remotedeck`). Run:
+Build with Go 1.25+, GCC and Node.js 24/npm. Build frontend assets first:
+
+```sh
+npm --prefix web ci
+npm --prefix web run check
+npm --prefix web run build
+go build -o ./bin/remotedeck ./cmd/remotedeck
+```
+
+The generated internal/webui/dist directory is ignored by Git but required by
+Go embed, including for tests. The binary embeds those assets and needs no Node
+runtime or external files to serve the UI. Run:
 
 ```sh
 ./bin/remotedeck -addr 127.0.0.1:8080 -data-dir ./data
@@ -22,7 +33,9 @@ opening SQLite. It then migrates SQLite, opens the loopback listener and
 reconciles interrupted jobs before serving HTTP or starting the worker. Log
 files, SQLite and its WAL/SHM sidecars are private to the service user.
 
-All API requests now require `Authorization: Bearer <token>`. Use the stdin-header
+Open the printed loopback address in a browser and log in with the private token.
+Browser sessions expire after 8 hours and disappear on restart. CLI requests use
+`Authorization: Bearer <token>`. Use the stdin-header
 curl example in README; do not put credentials in URLs, shell history, command-line
 arguments or logs. The token is not printed at startup. Existing data directories
 without a token get a new one automatically; database contents are unchanged.
@@ -31,8 +44,10 @@ The token persists across restarts. For rotation, stop the service, replace
 `auth.token` with a fresh cryptographically generated 64-character lowercase hex
 token (optional final LF), owned by the same user with mode 0600, then restart.
 Alternatively, securely archive the old token outside the data directory while
-stopped, leaving the path absent so startup generates a new one. Old credentials
-cease working only after restart. No online rotation or expiry mechanism exists.
+stopped, leaving the path absent so startup generates a new one. Old operator
+credentials cease working after restart, which also revokes browser sessions.
+Browser logout revokes one session online; operator rotation remains offline,
+with no automatic operator-token expiry.
 If token creation is interrupted or the file is malformed, startup fails rather
 than overwriting it; repair/rotate it while stopped. Restore mode 0600 if only
 permissions were changed. Backups contain the raw credential and need protection.

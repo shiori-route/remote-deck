@@ -18,6 +18,8 @@ internal/runner/     process groups, timeouts, bounded log persistence
 internal/worker/     durable claim → execute → complete loop
 internal/api/        versioned HTTP handlers
 internal/auth/       private operator token lifecycle and bearer verification
+internal/webui/      embedded static console and response security headers
+web/                Svelte/TypeScript source, lockfile, build and browser tests
 docs/                contracts, decisions, risks, progress and reviews
 ```
 
