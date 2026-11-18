@@ -107,9 +107,18 @@ this service is not ready for remote exposure.
   row retained, instance lock released. PASS; no task descendant was launched.
 - CI configured for Go 1.25.x and 1.27.x; GitHub-hosted runs not executed here.
 - Review: independent PASS against `906a6e9`; [report](reviews/step-05b-service.md).
+- Commit: `6f97719` — loopback service with safe lifecycle and CI.
 - M1 (Medium) fixed: crash-test readiness now requires a complete valid job ID,
   avoiding a race between ready-file creation and writing. Targeted race test
   repeated 5 times PASS; reviewer service tests uncached PASS.
 - Known limits: no auth/UI/SSE/retries/artifacts or general commands; total history
   retention unbounded; no hard-crash or escaped-descendant containment guarantee.
 - Next planned milestone after acceptance: authentication design and usable client.
+
+## Final progress bookkeeping
+
+- Scope: record the actual accepted service commit above after Git assigned it.
+- Review: self-review PASS; commit subject/hash checked against Git and the
+  one-file diff checked for whitespace. No code changes or new risks.
+- Validation: documentation links checked; application checks were completed in
+  step 5b and are not rerun for this documentation-only edit.
