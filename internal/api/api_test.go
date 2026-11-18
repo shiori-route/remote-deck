@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"remotedeck/internal/auth"
 	"remotedeck/internal/job"
 	"remotedeck/internal/runner"
 	"remotedeck/internal/store"
@@ -28,10 +29,18 @@ func testHandler(t *testing.T) Handler {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { s.Close() })
-	return Handler{s, dir, slog.New(slog.NewTextHandler(io.Discard, nil))}
+	v, err := auth.New(testToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Handler{Store: s, LogDirectory: dir, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Auth: v}
 }
+
+const testToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 func request(h Handler, method, path, body string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, "http://127.0.0.1"+path, strings.NewReader(body))
+	r.Header.Set("Authorization", "Bearer "+testToken)
 	if method == "POST" {
 		r.Header.Set("Content-Type", "application/json")
 	}
@@ -155,6 +164,7 @@ func TestStrictRequestsAndErrorEnvelope(t *testing.T) {
 		}
 	}
 	r := httptest.NewRequest("POST", "http://127.0.0.1/api/v1/jobs", strings.NewReader(validSubmission))
+	r.Header.Set("Authorization", "Bearer "+testToken)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != 415 {

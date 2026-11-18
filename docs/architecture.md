@@ -17,6 +17,7 @@ internal/task/       predefined task definitions and validation
 internal/runner/     process groups, timeouts, bounded log persistence
 internal/worker/     durable claim → execute → complete loop
 internal/api/        versioned HTTP handlers
+internal/auth/       private operator token lifecycle and bearer verification
 docs/                contracts, decisions, risks, progress and reviews
 ```
 

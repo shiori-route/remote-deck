@@ -5,6 +5,19 @@ Base path `/api/v1`. JSON responses use `{"data": ...}`; errors use
 Implemented and integration-tested, with a local runnable service. See progress
 for review status. Remote access and browser UI are not yet supported.
 
+## Authentication
+
+All routes require exactly one `Authorization: Bearer <token>` header, including
+job history, details, logs and task-type listing. The auth scheme is case-insensitive.
+The service generates a 256-bit random token, encoded as 64 lowercase hex
+characters, in `<data-dir>/auth.token` (0600). It is reused on restart.
+Missing, malformed, duplicate or incorrect credentials return `401` with
+`WWW-Authenticate: Bearer realm="remotedeck"` and error code `unauthorized`.
+No request body or job/log data is read before successful authentication.
+Tokens in URL queries, request bodies or cookies are not accepted.
+Host/Origin checks still apply, and can return 403 before credential checking.
+This is one operator credential with full API access, not a multi-user role system.
+
 ## Submit a job
 
 `POST /jobs`, `Content-Type: application/json`.
@@ -49,15 +62,16 @@ raw bytes incrementally. Responses must disable caching and MIME sniffing.
 
 ## Errors and access
 
-`400` invalid input; `403` forbidden origin/host; `404` unknown job/route; `405` unsupported method;
+`400` invalid input; `401` missing/invalid credentials; `403` forbidden origin/host;
+`404` unknown job/route; `405` unsupported method;
 `413` body too large; `415` unsupported media type; `429` queue full;
 `500` internal/persistence failure (without internal paths or SQL details).
 The service listens only on IPv4 loopback initially. Reject browser-originated
 requests carrying Origin or nonempty Sec-Fetch-Site headers; no CORS allowance.
 The Host header must be `127.0.0.1` with an optional port to reject DNS rebinding.
 Unknown or duplicate query keys are rejected on history and log endpoints.
-This mitigates browser access but is not authentication. Only trusted local
-processes should have access. A protected browser UI requires a later auth design.
+These browser guards supplement bearer authentication. Browser sessions, CSRF
+protection for a UI and remote TLS access require a separate design.
 
 ## Deferred
 

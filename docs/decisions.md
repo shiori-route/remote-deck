@@ -30,6 +30,18 @@ ownership with systemd/cgroups is required before unattended general workloads.
 
 ## D005 — Loopback-only milestone
 
-Authentication is deferred, so remote access is not supported. Reject network
-binds and browser-originated requests. A future UI and remote-access milestone
-must introduce an explicit authentication/CSRF/TLS design.
+The first milestone deferred authentication. Mandatory bearer authentication was
+added in D006; loopback-only binding and browser-origin rejection remain until
+browser-session/CSRF/TLS behavior is designed and tested.
+
+## D006 — One local operator bearer token
+
+Use a server-generated 256-bit token in a private `auth.token` file and require
+it on every API route. Reuse it across restarts, reject unsafe/malformed files,
+and compare fixed-size digests in constant time. No external dependency, database
+migration, JWT, password database or user-management service is needed for one
+operator. This changes previously anonymous API clients: they must send the header.
+
+The token grants full authority and is revoked by offline rotation plus restart.
+It is not a browser login/session solution or a multi-user authorization scheme.
+Keep loopback binding; introduce HTTPS and browser sessions in a later step.

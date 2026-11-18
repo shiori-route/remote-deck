@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 
+	"remotedeck/internal/auth"
 	"remotedeck/internal/job"
 	"remotedeck/internal/store"
 	"remotedeck/internal/task"
@@ -26,6 +27,7 @@ type Handler struct {
 	Store        *store.Store
 	LogDirectory string
 	Logger       *slog.Logger
+	Auth         auth.Verifier
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +40,11 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, origin := r.Header["Origin"]
 	if host != "127.0.0.1" || origin || r.Header.Get("Sec-Fetch-Site") != "" {
 		apiError(w, 403, "forbidden", "only trusted local clients are supported")
+		return
+	}
+	if !h.Auth.Allows(r.Header.Values("Authorization")) {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="remotedeck"`)
+		apiError(w, http.StatusUnauthorized, "unauthorized", "a valid bearer token is required")
 		return
 	}
 	path := r.URL.Path

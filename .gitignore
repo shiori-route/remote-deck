@@ -33,6 +33,7 @@ go.work.sum
 /data/
 /bin/
 /remotedeck
+auth.token
 
 # Editor/IDE
 # .idea/

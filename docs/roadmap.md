@@ -1,6 +1,6 @@
 # Prioritized implementation roadmap
 
-Each numbered step has its own tests, independent diff review, fixes and commit.
+Each numbered step has its own tests, diff review, fixes and focused commit.
 Do not proceed with unresolved Critical/High findings.
 
 1. **Design baseline**: schema, contracts, risks, directory structure and scope.
@@ -14,7 +14,8 @@ Do not proceed with unresolved Critical/High findings.
 5. **HTTP vertical slice** (split into reviewed handlers and service composition): strict requests, submission/status/history/logs,
    safe startup and shutdown, instance lock, API integration tests, actual Debian
    smoke test, updated quick start and GitHub Actions. This completes milestone 1.
-6. **Secure usable client**: authentication and threat model, mobile Svelte UI,
+6. **Secure usable client**: single-operator bearer authentication and threat model
+   implemented; next add browser sessions, mobile Svelte UI,
    protected remote access and deployment instructions. Review dependencies first.
 7. **Supervised task integration**: first implement systemd/cgroup process
    ownership and pass crash-injection tests proving descendant cleanup and

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"remotedeck/internal/api"
+	"remotedeck/internal/auth"
 	"remotedeck/internal/runner"
 	"remotedeck/internal/store"
 	"remotedeck/internal/worker"
@@ -30,6 +31,7 @@ type Service struct {
 	logger    *slog.Logger
 	closeOnce sync.Once
 	closeErr  error
+	auth      auth.Verifier
 }
 
 func Open(c Config, logger *slog.Logger) (s *Service, err error) {
@@ -81,6 +83,10 @@ func Open(c Config, logger *slog.Logger) (s *Service, err error) {
 	}
 	if err = syscall.Flock(int(s.lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		return s, fmt.Errorf("data directory already in use: %w", err)
+	}
+	s.auth, err = auth.LoadOrCreate(dir)
+	if err != nil {
+		return s, fmt.Errorf("initialize API authentication: %w", err)
 	}
 	f, err := privateFile(filepath.Join(dir, "jobs.db"))
 	if err != nil {
@@ -143,7 +149,7 @@ func (s *Service) Run(parent context.Context) (result error) {
 	defer func() { result = errors.Join(result, s.Close()) }()
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
-	h := api.Handler{Store: s.db, LogDirectory: s.directory, Logger: s.logger}
+	h := api.Handler{Store: s.db, LogDirectory: s.directory, Logger: s.logger, Auth: s.auth}
 	server := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
 	serveDone := make(chan error, 1)
 	workDone := make(chan error, 1)

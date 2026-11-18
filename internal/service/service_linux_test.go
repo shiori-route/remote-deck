@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"remotedeck/internal/auth"
 	"remotedeck/internal/job"
 )
 
@@ -43,7 +44,7 @@ func TestPrivateStorageAndInstanceLock(t *testing.T) {
 		s.Close()
 		t.Fatal("accepted second instance")
 	}
-	for _, name := range []string{"service.lock", "jobs.db", "jobs.db-wal", "jobs.db-shm"} {
+	for _, name := range []string{"service.lock", "jobs.db", "jobs.db-wal", "jobs.db-shm", auth.TokenFile} {
 		info, e := os.Stat(filepath.Join(dir, name))
 		if e != nil || info.Mode().Perm() != 0600 {
 			t.Fatalf("%s: %v %v", name, info, e)
@@ -82,7 +83,7 @@ func TestRejectUnsafeConfiguration(t *testing.T) {
 		s.Close()
 		t.Fatal("accepted symlink root")
 	}
-	for _, name := range []string{"service.lock", "jobs.db", "jobs.db-wal"} {
+	for _, name := range []string{"service.lock", "jobs.db", "jobs.db-wal", auth.TokenFile} {
 		dir = privateDir(t)
 		target := filepath.Join(privateDir(t), "target")
 		if e := os.WriteFile(target, []byte("preserve"), 0600); e != nil {
@@ -119,10 +120,39 @@ func TestWorkerFailureClosesServiceAndReleasesLock(t *testing.T) {
 	}
 }
 
+func TestInvalidTokenBlocksStartupAndReleasesLock(t *testing.T) {
+	dir := privateDir(t)
+	path := filepath.Join(dir, auth.TokenFile)
+	if err := os.WriteFile(path, []byte("incomplete-token"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if s, err := Open(Config{"127.0.0.1:0", dir}, testLogger()); err == nil {
+		s.Close()
+		t.Fatal("started with invalid credentials")
+	} else if strings.Contains(err.Error(), "incomplete-token") {
+		t.Fatal("startup error leaked credentials")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "jobs.db")); !os.IsNotExist(err) {
+		t.Fatal("database opened before token validation")
+	}
+	// An operator repair while stopped must not be blocked by a leaked lock.
+	if err := os.WriteFile(path, []byte(strings.Repeat("ab", 32)+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s := openService(t, dir)
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestActualHTTPServiceAndRestart(t *testing.T) {
 	dir := privateDir(t)
-	client := &http.Client{Timeout: 3 * time.Second}
 	s := openService(t, dir)
+	data, err := os.ReadFile(filepath.Join(dir, auth.TokenFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Timeout: 3 * time.Second, Transport: bearerTransport{token: strings.TrimSuffix(string(data), "\n")}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
@@ -182,6 +212,14 @@ func TestActualHTTPServiceAndRestart(t *testing.T) {
 	if e != nil || res.StatusCode != 200 || !strings.Contains(string(b), "Linux") {
 		t.Fatalf("restart logs %d %q %v", res.StatusCode, b, e)
 	}
+}
+
+type bearerTransport struct{ token string }
+
+func (tr bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", "Bearer "+tr.token)
+	return http.DefaultTransport.RoundTrip(r)
 }
 
 // This helper dies abruptly while holding the service lock and a running row.

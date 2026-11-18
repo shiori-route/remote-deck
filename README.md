@@ -13,7 +13,9 @@ execution, status/history queries and resumable raw log reads. The only task is
 
 Implemented protections include fixed argv, a minimal environment, task deadlines,
 process-group cleanup, output/queue/request bounds, private storage and a
-single-instance lock. Restart reconciliation records uncertain running jobs as
+single-instance lock. Every API request requires the local operator's bearer
+token, generated into `data/auth.token` on first startup (mode 0600).
+Restart reconciliation records uncertain running jobs as
 failed without rerunning them; it does not guarantee crash containment.
 
 ## MVP architecture
@@ -49,28 +51,43 @@ remain available on the next start. Do not expose it through a reverse proxy.
 
 ## API example
 
+After startup, use the token from the chosen data directory. The helper below
+passes the header through stdin so the secret is not a curl command-line argument.
+Run it from the directory containing `./data`; do not enable shell tracing.
+
 ```sh
-curl -sS http://127.0.0.1:8080/api/v1/jobs \
+rdcurl() {
+  printf 'Authorization: Bearer %s\n' "$(cat ./data/auth.token)" |
+    curl -sS --header @- "$@"
+}
+
+rdcurl http://127.0.0.1:8080/api/v1/jobs \
   -H 'Content-Type: application/json' \
   -d '{"task_type":"system-info","parameters":{}}'
 
 # Replace JOB_ID with data.id from the response.
-curl -sS http://127.0.0.1:8080/api/v1/jobs/JOB_ID
-curl -sS 'http://127.0.0.1:8080/api/v1/jobs/JOB_ID/logs?offset=0&limit=65536'
-curl -sS 'http://127.0.0.1:8080/api/v1/jobs?after=0&limit=20'
+rdcurl http://127.0.0.1:8080/api/v1/jobs/JOB_ID
+rdcurl 'http://127.0.0.1:8080/api/v1/jobs/JOB_ID/logs?offset=0&limit=65536'
+rdcurl 'http://127.0.0.1:8080/api/v1/jobs?after=0&limit=20'
 ```
 
 Submission returns HTTP 201 and a job ID for querying status and raw logs. See the
 [API contract](docs/api.md) for exact behavior.
+Missing or incorrect credentials return 401. Upgrading an existing data directory
+generates a token on first startup; previously unauthenticated clients must now
+send it. Jobs and logs are preserved, with no database schema change.
 
 ## Security and limitations
 
-Only trusted local callers are in scope for the first milestone; loopback is
-mandatory until authentication exists. Commands come from a server-side allowlist.
+Only authenticated local callers are supported. Loopback remains mandatory until
+TLS and the remote-access design are implemented. The token grants full access to
+the current API; it has no expiry or per-user roles. Processes running as the
+service user remain trusted because they can read its private files.
+Commands come from a server-side allowlist.
 No arbitrary shell execution, browser credentials, or caller-selected paths.
 See [security](docs/security.md) and [deployment](docs/deployment.md).
 
-There are no benchmark results or UI screenshots yet. Frontend, authentication,
+There are no benchmark results or UI screenshots yet. Frontend, browser sessions,
 SSE, cancellation API, retries, artifacts, and Codex integration are planned.
 Per-job output is capped at 4 MiB, but total history has no retention limit.
 Monitor disk space. Escaped descendants and hard-crash cleanup require future

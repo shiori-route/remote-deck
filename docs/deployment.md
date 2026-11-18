@@ -17,9 +17,25 @@ database/lock files. A missing directory is created with mode 0700. It holds a
 Linux flock until workers and storage are closed. A second instance using that
 directory fails startup. Do not delete or replace the lock file while running.
 
-Startup prepares private files, migrates SQLite, opens the loopback listener and
+Startup loads or creates `auth.token` after taking the instance lock and before
+opening SQLite. It then migrates SQLite, opens the loopback listener and
 reconciles interrupted jobs before serving HTTP or starting the worker. Log
 files, SQLite and its WAL/SHM sidecars are private to the service user.
+
+All API requests now require `Authorization: Bearer <token>`. Use the stdin-header
+curl example in README; do not put credentials in URLs, shell history, command-line
+arguments or logs. The token is not printed at startup. Existing data directories
+without a token get a new one automatically; database contents are unchanged.
+
+The token persists across restarts. For rotation, stop the service, replace
+`auth.token` with a fresh cryptographically generated 64-character lowercase hex
+token (optional final LF), owned by the same user with mode 0600, then restart.
+Alternatively, securely archive the old token outside the data directory while
+stopped, leaving the path absent so startup generates a new one. Old credentials
+cease working only after restart. No online rotation or expiry mechanism exists.
+If token creation is interrupted or the file is malformed, startup fails rather
+than overwriting it; repair/rotate it while stopped. Restore mode 0600 if only
+permissions were changed. Backups contain the raw credential and need protection.
 
 SIGINT/SIGTERM shutdown: stop taking HTTP requests, cancel active execution and its
 process group, persist its outcome, join the worker and close the database before

@@ -1,8 +1,9 @@
 # Development progress
 
-Current status: the first local HTTP vertical slice is implemented, tested and
-independently reviewed. Authentication and a usable browser client are next;
-this service is not ready for remote exposure.
+Current status: the first local HTTP vertical slice and mandatory operator bearer
+authentication are implemented and tested. The original slice passed independent
+reviews; the authentication step received a self-review. Browser sessions and a
+usable client are next; this service is not ready for remote exposure.
 
 ## Repository baseline
 
@@ -122,3 +123,33 @@ this service is not ready for remote exposure.
   one-file diff checked for whitespace. No code changes or new risks.
 - Validation: documentation links checked; application checks were completed in
   step 5b and are not rerun for this documentation-only edit.
+
+## Step 6a — Mandatory local API authentication
+
+- Baseline: `43152c2`; continued in the existing `dev` worktree after the workspace
+  root moved to its parent. Earlier AGENTS.md instructions were revoked by the
+  user; this step uses self-review, not an independent agent review.
+- Scope: `internal/auth`, API/service integration and tests, synchronized docs.
+- First startup generates a 256-bit token in `auth.token` (0600), persists it,
+  and reuses it across restarts. Unsafe/malformed existing token files fail closed.
+- All routes require one bearer header, including read-only endpoints and logs.
+  Missing/invalid/duplicate credentials return 401 before application body/storage
+  access. Zero-value verifier denies access. Existing Host/Origin guards remain.
+- Runtime verifier keeps a digest; credential comparison is constant-time.
+  No new dependencies or schema migration. Existing clients must add the header.
+- Validation: full `go test ./...`, `go test -race ./...`, `go vet ./...` PASS
+  with Go 1.27.4 on Debian. Auth/API/service tests cover invalid headers, unsafe
+  files, stable tokens, rotation, startup failure cleanup and authorized execution.
+- Real binary smoke PASS: upgraded a temporary data directory created by the
+  pre-auth binary, preserved its existing job/log, rejected anonymous requests and
+  wrong credentials, confirmed unauthorized submission had no effect, exercised
+  README's stdin-header curl helper, restarted with the same token, rotated the
+  token offline and rejected the old credential. Secrets absent from captured
+  service/task logs in that scenario. No service left running.
+- Self-review: PASS; [report](reviews/step-06a-auth.md). Token permission regression
+  setup explicitly chmods the unsafe fixture so it works under restrictive umasks.
+- Known limits: one full-authority token, no expiry/online revocation/user roles,
+  no browser session or TLS, same-OS-user processes remain trusted. Tasks still
+  share the service identity/data directory; future providers need isolation design.
+- Next step: browser-session and CSRF design, then a usable client; keep loopback
+  binding until protected remote access is designed and tested.
