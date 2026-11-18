@@ -20,7 +20,7 @@
   [step 1 review](reviews/step-01-design.md).
 - Important resolution: made tested systemd/cgroup supervision a prerequisite
   for general benchmark/Codex providers, fixing the original roadmap ordering.
-- Commit: will be recorded after the accepted design commit is created.
+- Commit: `ace0150` — `docs: establish reviewed MVP architecture and API contracts`.
 - Known limitations: all executable behavior is still unimplemented; SQLite driver
   approval pending. The temporary Go toolchain is available for implementation tests.
 - Next step after acceptance: persistent job queue.
