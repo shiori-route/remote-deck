@@ -3,6 +3,7 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -23,7 +23,10 @@ import (
 	"remotedeck/internal/worker"
 )
 
-type Config struct{ Address, DataDirectory string }
+type Config struct {
+	Address, DataDirectory  string
+	Origin, TLSCert, TLSKey string
+}
 type Service struct {
 	directory string
 	lock      *os.File
@@ -33,19 +36,17 @@ type Service struct {
 	closeOnce sync.Once
 	closeErr  error
 	auth      auth.Verifier
+	origin    string
+	tlsConfig *tls.Config
 }
 
 func Open(c Config, logger *slog.Logger) (s *Service, err error) {
 	if os.Geteuid() == 0 {
 		return nil, errors.New("run as a dedicated non-root user")
 	}
-	host, port, err := net.SplitHostPort(c.Address)
-	if err != nil || host != "127.0.0.1" {
-		return nil, errors.New("address must be 127.0.0.1:<port>")
-	}
-	p, err := strconv.Atoi(port)
-	if err != nil || p < 0 || p > 65535 {
-		return nil, errors.New("invalid port")
+	tlsConfig, err := transportConfig(c)
+	if err != nil {
+		return nil, err
 	}
 	if c.DataDirectory == "" {
 		return nil, errors.New("data directory is required")
@@ -71,7 +72,7 @@ func Open(c Config, logger *slog.Logger) (s *Service, err error) {
 	if !info.IsDir() || info.Mode().Perm() != 0700 || info.Sys().(*syscall.Stat_t).Uid != uint32(os.Geteuid()) {
 		return nil, errors.New("data directory must be owned by the service user with mode 0700")
 	}
-	s = &Service{directory: dir, logger: logger}
+	s = &Service{directory: dir, logger: logger, origin: c.Origin, tlsConfig: tlsConfig}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, s.Close())
@@ -119,6 +120,9 @@ func Open(c Config, logger *slog.Logger) (s *Service, err error) {
 	if err != nil {
 		return s, err
 	}
+	if s.origin == "" {
+		s.origin = "http://" + s.Address()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err = s.db.Reconcile(ctx); err != nil {
@@ -150,16 +154,22 @@ func (s *Service) Run(parent context.Context) (result error) {
 	defer func() { result = errors.Join(result, s.Close()) }()
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
-	sessions := auth.NewSessions("http://" + s.Address())
+	sessions := auth.NewSessions(s.origin)
 	h := api.Handler{Store: s.db, LogDirectory: s.directory, Logger: s.logger, Auth: s.auth, Sessions: sessions}
-	server := &http.Server{Handler: webui.Handler(h, s.Address()), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
+	server := &http.Server{TLSConfig: s.tlsConfig, Handler: webui.Handler(h, s.origin), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}
 	serveDone := make(chan error, 1)
 	workDone := make(chan error, 1)
-	go func() { serveDone <- server.Serve(s.listener) }()
+	go func() {
+		if s.tlsConfig != nil {
+			serveDone <- server.ServeTLS(s.listener, "", "")
+		} else {
+			serveDone <- server.Serve(s.listener)
+		}
+	}()
 	go func() {
 		workDone <- (worker.Worker{Store: s.db, Executor: runner.Runner{Directory: s.directory}, Logger: s.logger}).Run(ctx)
 	}()
-	s.logger.Info("service listening", "address", s.Address())
+	s.logger.Info("service listening", "address", s.Address(), "origin", s.origin)
 	select {
 	case <-ctx.Done():
 	case err := <-serveDone:

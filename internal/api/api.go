@@ -1,4 +1,4 @@
-// Package api serves the loopback-only, versioned task API.
+// Package api serves the authenticated, versioned task API.
 package api
 
 import (
@@ -40,8 +40,12 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	_, origin := r.Header["Origin"]
 	fetchSite := r.Header.Get("Sec-Fetch-Site")
-	if host != "127.0.0.1" || (origin && !h.Sessions.SameOrigin(r)) || (fetchSite != "" && fetchSite != "same-origin") {
-		apiError(w, 403, "forbidden", "only trusted local clients are supported")
+	trustedHost := host == "127.0.0.1" && r.TLS == nil
+	if h.Sessions != nil {
+		trustedHost = h.Sessions.MatchesRequest(r)
+	}
+	if !trustedHost || (origin && !h.Sessions.SameOrigin(r)) || (fetchSite != "" && fetchSite != "same-origin") {
+		apiError(w, 403, "forbidden", "unexpected request origin or host")
 		return
 	}
 	if r.URL.Path == "/api/v1/session" {

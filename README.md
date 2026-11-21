@@ -2,15 +2,15 @@
 
 RemoteDeck is a self-hosted task runner for Linux: submit approved tasks over HTTP,
 keep their status and output, and inspect results without an interactive SSH session.
-A responsive local browser console supports desktop and narrow-screen layouts.
+A responsive browser console supports desktop and narrow-screen layouts.
 
 ## Development status
 
 The first local HTTP vertical slice is implemented: durable submission, sequential
 execution, status/history queries and resumable raw log reads. The only task is
 `system-info` (`/usr/bin/uname -a`). The Svelte console supports login, submission,
-history pagination, details, incremental logs and logout. Remote access is not
-supported yet. See
+history pagination, details, incremental logs and logout. Explicitly configured
+direct HTTPS supports a single operator over a private network/VPN. See
 [progress](docs/progress.md) and [roadmap](docs/roadmap.md) for review status.
 
 Implemented protections include fixed argv, a minimal environment, task deadlines,
@@ -25,7 +25,7 @@ failed without rerunning them; it does not guarantee crash containment.
 
 ```mermaid
 flowchart LR
-    Client --> API[Go HTTP API on loopback]
+    Client --> API[Go API: loopback HTTP or direct HTTPS]
     API --> DB[(SQLite jobs and transitions)]
     Worker[Single worker] --> DB
     Worker --> Process[Approved executable]
@@ -52,15 +52,17 @@ go build -o ./bin/remotedeck ./cmd/remotedeck
 ./bin/remotedeck -addr 127.0.0.1:8080 -data-dir ./data
 ```
 
-The service creates a missing data directory, listens only on IPv4 loopback and
-writes structured lifecycle logs to stderr. Stop it with Ctrl-C; queued jobs
-remain available on the next start. Do not expose it through a reverse proxy.
+The default service creates a missing data directory, listens on IPv4 loopback
+and writes structured lifecycle logs to stderr. Stop it with Ctrl-C; queued jobs
+remain available on the next start. For remote access, configure direct TLS using
+the [HTTPS deployment instructions](docs/deployment.md#direct-https-access).
+TLS-terminating reverse proxies and forwarded headers are not supported.
 
 Open **http://127.0.0.1:8080/** on the server's browser and enter the private token
 from `./data/auth.token`. The form clears it after each login attempt; it is never
 saved to localStorage/sessionStorage. Sessions expire after 8 hours, logout or
-service restart. Use the exact 127.0.0.1 address, not localhost. Narrow-screen
-support does not yet provide phone network access; the listener stays local-only.
+service restart. Use the exact 127.0.0.1 address, not localhost. Access from another
+device requires the HTTPS deployment and a trusted certificate.
 
 Frontend output in `internal/webui/dist` is generated and ignored by Git, then
 embedded into Go. **Build the frontend before Go build/test on a fresh checkout.**
@@ -97,9 +99,9 @@ send it. Jobs and logs are preserved, with no database schema change.
 
 ## Security and limitations
 
-Only authenticated local callers are supported. Cookie mutations require exact
-Origin and per-session CSRF checks. Loopback remains mandatory until
-TLS and the remote-access design are implemented. The token grants full access to
+HTTP remains loopback-only; non-loopback listeners require a certificate, private
+key and exact HTTPS origin. Cookie mutations require exact Origin and per-session
+CSRF checks. HTTPS uses Secure, HttpOnly, host-prefixed cookies. The token grants full access to
 the current API; it has no expiry or per-user roles. Processes running as the
 service user remain trusted because they can read its private files.
 Commands come from a server-side allowlist.
@@ -129,6 +131,7 @@ go vet ./...
 # After building ./bin/remotedeck:
 cd web
 npx playwright install chromium
+# Browser TLS fixtures also require OpenSSL.
 npm run test:e2e
 ```
 

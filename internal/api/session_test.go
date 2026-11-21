@@ -103,3 +103,29 @@ func TestBrowserSessionCSRFAndLogout(t *testing.T) {
 		t.Fatal("bearer compatibility broken")
 	}
 }
+
+func TestLoginRateLimit(t *testing.T) {
+	h := testHandler(t)
+	h.Sessions = auth.NewSessions("http://127.0.0.1")
+	for i := 0; i < 11; i++ {
+		r := httptest.NewRequest("POST", "http://127.0.0.1/api/v1/session", nil)
+		r.Header.Set("Origin", "http://127.0.0.1")
+		r.Header.Set("Authorization", "Bearer invalid")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		want := 401
+		if i == 10 {
+			want = 429
+		}
+		if w.Code != want {
+			t.Fatalf("attempt %d: %d", i, w.Code)
+		}
+		if i == 10 && w.Header().Get("Retry-After") != "1" {
+			t.Fatal("missing retry hint")
+		}
+	}
+	// Login throttling does not lock out already-authorized CLI clients.
+	if w := request(h, "GET", "/api/v1/jobs", ""); w.Code != 200 {
+		t.Fatal("login limit blocked bearer")
+	}
+}

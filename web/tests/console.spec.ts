@@ -1,21 +1,42 @@
 import { test, expect } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { mkdtemp, chmod, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
+import { createServer } from 'node:net';
 
 let process: ChildProcess;
 let base: string;
 let directory: string;
 let token: string;
 let serviceLogs = '';
+let secure = false;
+let cookieName = 'remotedeck_session';
 
-test.beforeAll(async () => {
+test.beforeAll(async ({}, testInfo) => {
+  secure = testInfo.project.name.startsWith('https-');
+  cookieName = secure ? '__Host-remotedeck_session' : 'remotedeck_session';
   directory = await mkdtemp(join(tmpdir(), 'remotedeck-browser-'));
   await chmod(directory, 0o700);
-  process = spawn(globalThis.process.env.REMOTEDECK_BIN || resolve('../bin/remotedeck'), ['-addr', '127.0.0.1:0', '-data-dir', directory], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const args = ['-addr', '127.0.0.1:0', '-data-dir', directory];
+  if (secure) {
+    const reservation = createServer();
+    reservation.listen(0, '127.0.0.1');
+    await once(reservation, 'listening');
+    const address = reservation.address();
+    if (!address || typeof address === 'string') throw new Error('missing port');
+    const port = address.port;
+    await new Promise<void>((resolve, reject) => reservation.close(err => err ? reject(err) : resolve()));
+    const cert = join(directory, 'cert.pem');
+    const key = join(directory, 'key.pem');
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes', '-days', '1', '-subj', '/CN=RemoteDeck browser test', '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', key, '-out', cert], { stdio: 'ignore' });
+    await chmod(key, 0o600);
+    args[1] = `127.0.0.1:${port}`;
+    args.push('-origin', `https://127.0.0.1:${port}`, '-tls-cert', cert, '-tls-key', key);
+  }
+  process = spawn(globalThis.process.env.REMOTEDECK_BIN || resolve('../bin/remotedeck'), args, { stdio: ['ignore', 'ignore', 'pipe'] });
   const lines = createInterface({ input: process.stderr! });
   base = await new Promise<string>((resolveReady, reject) => {
     const timeout = setTimeout(() => reject(new Error('service readiness timed out')), 10_000);
@@ -25,7 +46,7 @@ test.beforeAll(async () => {
       serviceLogs += line + '\n';
       try {
         const entry = JSON.parse(line);
-        if (entry.msg === 'service listening') { clearTimeout(timeout); resolveReady('http://' + entry.address); }
+        if (entry.msg === 'service listening') { clearTimeout(timeout); resolveReady(entry.origin); }
       } catch { /* Non-JSON diagnostics are retained for the leak check. */ }
     });
   });
@@ -51,8 +72,11 @@ test('login, submit, logs, resume, CSRF and logout', async ({ page, context }, t
   await expect(page.getByRole('heading', { name: '任务工作台' })).toBeVisible();
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0,0]);
   const cookies = await context.cookies();
-  const session = cookies.find(cookie => cookie.name === 'remotedeck_session');
+  const session = cookies.find(cookie => cookie.name === cookieName);
   expect(session?.httpOnly).toBe(true);
+  expect(session?.secure).toBe(secure);
+  expect(session?.path).toBe(secure ? '/' : '/api/v1');
+  if (secure) await expect(page.getByText('HTTPS 连接', { exact: true })).toBeVisible();
   expect(session?.sameSite).toBe('Strict');
   expect(await page.evaluate(() => document.cookie.includes('remotedeck_session'))).toBe(false);
 
@@ -106,7 +130,7 @@ test('login, submit, logs, resume, CSRF and logout', async ({ page, context }, t
 
   await page.getByRole('button', { name: '退出登录' }).click();
   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible();
-  const replay = await context.request.get(base + '/api/v1/jobs', { headers: { Cookie: `remotedeck_session=${session!.value}` } });
+  const replay = await context.request.get(base + '/api/v1/jobs', { headers: { Cookie: `${cookieName}=${session!.value}` } });
   expect(replay.status()).toBe(401);
   await page.reload();
   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible();

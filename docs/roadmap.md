@@ -15,8 +15,9 @@ Do not proceed with unresolved Critical/High findings.
    safe startup and shutdown, instance lock, API integration tests, actual Debian
    smoke test, updated quick start and GitHub Actions. This completes milestone 1.
 6. **Secure usable client**: single-operator bearer authentication, browser
-   sessions/CSRF and responsive local Svelte UI implemented. Next design protected
-   HTTPS remote access and deployment. Narrow-screen layout is not remote access.
+   sessions/CSRF, responsive Svelte UI and explicit direct HTTPS implemented.
+   Private-network deployment instructions and local TLS/browser tests are available;
+   operator DNS, trusted certificates, VPN/firewall provisioning remain external.
 7. **Supervised task integration**: first implement systemd/cgroup process
    ownership and pass crash-injection tests proving descendant cleanup and
    restart reconciliation. This is an acceptance gate before registering any

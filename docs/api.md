@@ -2,9 +2,9 @@
 
 Base path `/api/v1`. JSON responses use `{"data": ...}`; errors use
 `{"error":{"code":"...","message":"..."}}`. Logs are the only binary response.
-Implemented and integration-tested, with a local runnable service. See progress
-for review status. The local browser console is served at `/`; remote access is
-not supported.
+Implemented and integration-tested. See progress for review status. The browser
+console is served at `/`, using loopback HTTP by default or explicitly configured
+direct HTTPS for private-network/VPN access.
 
 ## Authentication
 
@@ -25,14 +25,19 @@ This is one operator credential with full API access, not a multi-user role syst
 - `POST /session`: exact configured Origin and operator bearer header required;
   no body. Returns 201 with `data.csrf_token` and `data.expires_at`. Sets an opaque
   `remotedeck_session` cookie: HttpOnly, SameSite=Strict, Path=/api/v1, no Domain,
-  Max-Age=28800. Secure is absent only for this loopback HTTP deployment.
+  Max-Age=28800 on loopback HTTP. HTTPS instead uses
+  `__Host-remotedeck_session`, Secure, HttpOnly, SameSite=Strict, Path=/, no Domain,
+  with the same lifetime. Only the cookie for the actual transport is accepted.
+  Login attempts share a process-wide bucket: burst 10, refill one per second;
+  exhaustion returns 429 `login_rate_limit` and `Retry-After: 1`.
 - `GET /session`: valid session cookie required. Returns its CSRF token and expiry
   for reload/resume; never returns the session ID or operator token.
 - `DELETE /session`: valid cookie, exact Origin and X-CSRF-Token required. Revokes
   the server entry, expires the cookie and returns 204.
 
 Cookie-authenticated writes require the exact configured origin, including the
-actual listener port, and one matching X-CSRF-Token header. Missing/invalid CSRF
+port in the configured HTTPS origin (or actual HTTP listener), and one matching
+X-CSRF-Token header. Missing/invalid CSRF
 returns 403 `csrf_failed`; origin guard failures return 403 `forbidden`. Bearer
 CLI requests do not require CSRF. Reauthentication rotates the current session.
 Sessions have an absolute 8-hour lifetime, are capped at 64 (429 when full), and
@@ -85,15 +90,17 @@ raw bytes incrementally. Responses must disable caching and MIME sniffing.
 
 `400` invalid input; `401` missing/invalid credentials; `403` forbidden origin/host;
 `404` unknown job/route; `405` unsupported method;
-`413` body too large; `415` unsupported media type; `429` queue full;
+`413` body too large; `415` unsupported media type; `429` queue/session/login limit;
 `500` internal/persistence failure (without internal paths or SQL details).
-The service listens only on IPv4 loopback. Host must match the actual listener
-address including port. Origin, when present, must exactly match that address.
+HTTP listens only on 127.0.0.1; TLS enables explicit IPv4 network binding. Host
+and actual transport must match the configured HTTPS origin, or the actual HTTP
+listener. Origin, when present, must exactly match that origin. Forwarded and
+X-Forwarded-* headers do not change this decision.
 API Fetch Metadata, when present, must be `same-origin`; cross-site and same-site
 requests are rejected, and no CORS allowance is added.
 Unknown or duplicate query keys are rejected on history and log endpoints.
 The public shell/assets contain no job data or credentials. They also permit
-direct navigation (`Sec-Fetch-Site: none`). Remote TLS needs a separate design.
+direct navigation (`Sec-Fetch-Site: none`). No HTTP redirect listener is opened.
 
 ## Deferred
 

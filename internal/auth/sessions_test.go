@@ -107,3 +107,32 @@ func TestOriginAndDuplicateCookie(t *testing.T) {
 		t.Fatal("duplicate session cookie accepted")
 	}
 }
+
+func TestLoginRateLimitAndTransport(t *testing.T) {
+	s := NewSessions("https://deck.example.test")
+	now := time.Now()
+	s.now = func() time.Time { return now }
+	s.loginLast = now
+	for i := 0; i < 10; i++ {
+		if !s.AllowLogin() {
+			t.Fatal("burst rejected")
+		}
+	}
+	if s.AllowLogin() {
+		t.Fatal("unbounded login attempts")
+	}
+	now = now.Add(time.Second)
+	if !s.AllowLogin() || s.AllowLogin() {
+		t.Fatal("incorrect refill")
+	}
+	r := httptest.NewRequest("POST", "https://deck.example.test/api/v1/session", nil)
+	r.Header.Set("Origin", "https://deck.example.test")
+	if !s.SameOrigin(r) {
+		t.Fatal("HTTPS origin rejected")
+	}
+	r.TLS = nil
+	r.Header.Set("X-Forwarded-Proto", "https")
+	if s.SameOrigin(r) {
+		t.Fatal("trusted spoofed transport")
+	}
+}

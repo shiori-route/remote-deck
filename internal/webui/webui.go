@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+
+	"remotedeck/internal/auth"
 )
 
 // Build assets with `npm ci && npm run build` in web before building Go.
@@ -13,7 +15,7 @@ import (
 //go:embed dist
 var assets embed.FS
 
-func Handler(api http.Handler, host string) http.Handler {
+func Handler(api http.Handler, origin string) http.Handler {
 	files, err := fs.Sub(assets, "dist")
 	if err != nil {
 		panic(err)
@@ -25,7 +27,7 @@ func Handler(api http.Handler, host string) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
-		if r.Host != host {
+		if auth.RequestOrigin(r) != origin {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(403)
 			_, _ = w.Write([]byte(`{"error":{"code":"forbidden","message":"unexpected host"}}`))
@@ -35,7 +37,7 @@ func Handler(api http.Handler, host string) http.Handler {
 			api.ServeHTTP(w, r)
 			return
 		}
-		if origins := r.Header.Values("Origin"); len(origins) > 0 && (len(origins) != 1 || origins[0] != "http://"+host) {
+		if origins := r.Header.Values("Origin"); len(origins) > 0 && (len(origins) != 1 || origins[0] != origin) {
 			http.Error(w, "forbidden", 403)
 			return
 		}

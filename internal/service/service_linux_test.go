@@ -29,7 +29,7 @@ func privateDir(t *testing.T) string {
 func testLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 func openService(t *testing.T, dir string) *Service {
 	t.Helper()
-	s, e := Open(Config{"127.0.0.1:0", dir}, testLogger())
+	s, e := Open(Config{Address: "127.0.0.1:0", DataDirectory: dir}, testLogger())
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -39,7 +39,7 @@ func openService(t *testing.T, dir string) *Service {
 func TestPrivateStorageAndInstanceLock(t *testing.T) {
 	dir := privateDir(t)
 	s := openService(t, dir)
-	if other, e := Open(Config{"127.0.0.1:0", dir}, testLogger()); e == nil {
+	if other, e := Open(Config{Address: "127.0.0.1:0", DataDirectory: dir}, testLogger()); e == nil {
 		other.Close()
 		s.Close()
 		t.Fatal("accepted second instance")
@@ -61,7 +61,7 @@ func TestPrivateStorageAndInstanceLock(t *testing.T) {
 
 func TestRejectUnsafeConfiguration(t *testing.T) {
 	for _, addr := range []string{"0.0.0.0:8080", ":8080", "localhost:8080", "[::1]:8080", "127.0.0.1:http"} {
-		if s, e := Open(Config{addr, privateDir(t)}, testLogger()); e == nil {
+		if s, e := Open(Config{Address: addr, DataDirectory: privateDir(t)}, testLogger()); e == nil {
 			s.Close()
 			t.Fatalf("accepted %s", addr)
 		}
@@ -70,7 +70,7 @@ func TestRejectUnsafeConfiguration(t *testing.T) {
 	if e := os.Chmod(dir, 0755); e != nil {
 		t.Fatal(e)
 	}
-	if s, e := Open(Config{"127.0.0.1:0", dir}, testLogger()); e == nil {
+	if s, e := Open(Config{Address: "127.0.0.1:0", DataDirectory: dir}, testLogger()); e == nil {
 		s.Close()
 		t.Fatal("accepted shared directory")
 	}
@@ -79,7 +79,7 @@ func TestRejectUnsafeConfiguration(t *testing.T) {
 	if e := os.Symlink(privateDir(t), link); e != nil {
 		t.Fatal(e)
 	}
-	if s, e := Open(Config{"127.0.0.1:0", link}, testLogger()); e == nil {
+	if s, e := Open(Config{Address: "127.0.0.1:0", DataDirectory: link}, testLogger()); e == nil {
 		s.Close()
 		t.Fatal("accepted symlink root")
 	}
@@ -92,7 +92,7 @@ func TestRejectUnsafeConfiguration(t *testing.T) {
 		if e := os.Symlink(target, filepath.Join(dir, name)); e != nil {
 			t.Fatal(e)
 		}
-		if s, e := Open(Config{"127.0.0.1:0", dir}, testLogger()); e == nil {
+		if s, e := Open(Config{Address: "127.0.0.1:0", DataDirectory: dir}, testLogger()); e == nil {
 			s.Close()
 			t.Fatalf("accepted symlink %s", name)
 		}
@@ -126,7 +126,7 @@ func TestInvalidTokenBlocksStartupAndReleasesLock(t *testing.T) {
 	if err := os.WriteFile(path, []byte("incomplete-token"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if s, err := Open(Config{"127.0.0.1:0", dir}, testLogger()); err == nil {
+	if s, err := Open(Config{Address: "127.0.0.1:0", DataDirectory: dir}, testLogger()); err == nil {
 		s.Close()
 		t.Fatal("started with invalid credentials")
 	} else if strings.Contains(err.Error(), "incomplete-token") {
@@ -258,7 +258,7 @@ func TestCrashHelper(t *testing.T) {
 		return
 	}
 	dir := os.Args[len(os.Args)-1]
-	s, e := Open(Config{"127.0.0.1:0", dir}, testLogger())
+	s, e := Open(Config{Address: "127.0.0.1:0", DataDirectory: dir}, testLogger())
 	if e != nil {
 		os.Exit(2)
 	}

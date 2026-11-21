@@ -4,6 +4,7 @@
   type State = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
   type Job = { id: string; sequence: number; task_type: string; state: State; created_at: string; started_at: string | null; completed_at: string | null; exit_code: number | null; error: string };
   const labels: Record<State, string> = { queued: '排队中', running: '运行中', succeeded: '已完成', failed: '失败', cancelled: '已取消', timed_out: '已超时' };
+  const secure = window.location.protocol === 'https:';
   let checking = $state(true);
   let authenticated = $state(false);
   let token = $state('');
@@ -141,26 +142,26 @@
 <div class="shell">
   <header class="topbar">
     <a class="brand" href="/" aria-label="RemoteDeck 首页"><span class="brand-mark" aria-hidden="true">R<span>↗</span></span><span>RemoteDeck<small>任务控制台</small></span></a>
-    <div class="top-actions"><span class="local-tag"><span></span> 本机连接</span>{#if authenticated}<button class="quiet" onclick={logout} disabled={busy}>退出登录</button>{/if}</div>
+    <div class="top-actions"><span class="local-tag"><span></span> {secure ? 'HTTPS 连接' : '本机连接'}</span>{#if authenticated}<button class="quiet" onclick={logout} disabled={busy}>退出登录</button>{/if}</div>
   </header>
 
   {#if checking}
     <main class="login-layout"><p role="status">正在检查会话…</p></main>
   {:else if !authenticated}
     <main class="login-layout">
-      <section class="intro"><p class="eyebrow">YOUR TASKS. YOUR MACHINE.</p><h1>让任务继续，<br />把结果留住。</h1><p class="intro-copy">提交任务，查看执行状态，随时回来读取日志。<br />从这台机器上的第一项任务开始。</p><div class="flow-note"><span>01 提交</span><i>→</i><span>02 执行</span><i>→</i><span>03 查看结果</span></div></section>
+      <section class="intro"><p class="eyebrow">YOUR TASKS. YOUR MACHINE.</p><h1>让任务继续，<br />把结果留住。</h1><p class="intro-copy">提交任务，查看执行状态，随时回来读取日志。<br />从第一项任务开始。</p><div class="flow-note"><span>01 提交</span><i>→</i><span>02 执行</span><i>→</i><span>03 查看结果</span></div></section>
       <form class="login-card" onsubmit={login}>
-        <span class="card-kicker">连接工作台</span><h2>欢迎回来</h2><p>输入本机访问令牌，开启一个安全会话。</p>
+        <span class="card-kicker">连接工作台</span><h2>欢迎回来</h2><p>输入服务访问令牌，开启一个安全会话。</p>
         <label for="access-token">访问令牌</label><input id="access-token" type="password" bind:value={token} required autocomplete="off" spellcheck="false" placeholder="粘贴访问令牌" aria-describedby="token-help" disabled={busy} />
         <p id="token-help" class="help">令牌位于服务数据目录中的 <code>auth.token</code>。令牌不会保存到浏览器本地存储。</p>
         {#if message}<p class="error" role="alert">{message}</p>{/if}
         <button class="primary wide" type="submit" disabled={busy}>{busy ? '正在连接…' : '进入控制台'} <span aria-hidden="true">→</span></button>
-        <p class="login-foot">会话 8 小时后失效 · 仅限本机访问</p>
+        <p class="login-foot">会话 8 小时后失效 · {secure ? '加密连接' : '仅限本机访问'}</p>
       </form>
     </main>
   {:else}
     <main class="dashboard">
-      <div class="page-heading"><div><p class="eyebrow">WORKSPACE / LOCAL</p><h1>任务工作台</h1><p>执行有记录，结果可追溯。</p></div><div class="session-note">会话有效至<br /><strong>{date(expires)}</strong></div></div>
+      <div class="page-heading"><div><p class="eyebrow">WORKSPACE / {secure ? 'HTTPS' : 'LOCAL'}</p><h1>任务工作台</h1><p>执行有记录，结果可追溯。</p></div><div class="session-note">会话有效至<br /><strong>{date(expires)}</strong></div></div>
       {#if message}<p class="error page-error" role="alert">{message}</p>{/if}
       <section class="submit-card" aria-labelledby="submit-title"><div class="task-icon" aria-hidden="true">&gt;_</div><div class="task-description"><span class="card-kicker">预定义任务</span><h2 id="submit-title">系统信息</h2><p>读取 Linux 内核与主机信息，输出保存为任务日志。</p></div><div class="task-meta"><code>system-info</code><span>最长 10 秒 · 顺序执行</span></div><button class="primary" onclick={submit} disabled={busy}>{busy ? '处理中…' : '提交任务'} <span aria-hidden="true">↗</span></button></section>
       <div class="workspace-grid">
@@ -186,7 +187,7 @@
           {:else}<div class="empty-state detail-empty"><span class="empty-icon" aria-hidden="true">↖</span><h3>选择一项任务</h3><p>查看状态、退出码和保存的输出日志。</p></div>{/if}
         </section>
       </div>
-      <footer><span>RemoteDeck · 本地任务执行</span><span>状态每 1.5 秒更新 · 关闭页面不会取消任务</span></footer>
+      <footer><span>RemoteDeck · 任务执行</span><span>状态每 1.5 秒更新 · 关闭页面不会取消任务</span></footer>
     </main>
   {/if}
 </div>

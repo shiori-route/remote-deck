@@ -50,6 +50,11 @@ func (h Handler) session(w http.ResponseWriter, r *http.Request) {
 			apiError(w, 403, "forbidden", "same-origin login required")
 			return
 		}
+		if !h.Sessions.AllowLogin() {
+			w.Header().Set("Retry-After", "1")
+			apiError(w, 429, "login_rate_limit", "too many login attempts; retry later")
+			return
+		}
 		if !h.Auth.Allows(r.Header.Values("Authorization")) {
 			unauthorized(w)
 			return
@@ -59,7 +64,7 @@ func (h Handler) session(w http.ResponseWriter, r *http.Request) {
 			apiError(w, 429, "session_limit", "too many active sessions; sign out or wait for expiry")
 			return
 		}
-		setSessionCookie(w, id, entry.ExpiresAt)
+		setSessionCookie(w, r, id, entry.ExpiresAt)
 		writeJSON(w, 201, map[string]any{"data": entry})
 	case http.MethodGet, http.MethodDelete:
 		id := auth.SessionID(r)
@@ -80,19 +85,22 @@ func (h Handler) session(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.Sessions.Delete(id)
-		setSessionCookie(w, "", time.Time{})
+		setSessionCookie(w, r, "", time.Time{})
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		methodError(w, "GET, POST, DELETE")
 	}
 }
 
-func setSessionCookie(w http.ResponseWriter, id string, expires time.Time) {
-	cookie := &http.Cookie{Name: auth.SessionCookieName, Value: id, Path: "/api/v1", HttpOnly: true, SameSite: http.SameSiteStrictMode, Expires: expires, MaxAge: int(auth.SessionTTL.Seconds())}
+func setSessionCookie(w http.ResponseWriter, r *http.Request, id string, expires time.Time) {
+	cookie := &http.Cookie{Name: auth.CookieName(r), Value: id, Path: "/api/v1", HttpOnly: true, SameSite: http.SameSiteStrictMode, Expires: expires, MaxAge: int(auth.SessionTTL.Seconds())}
+	if r.TLS != nil {
+		cookie.Secure = true
+		cookie.Path = "/"
+	}
 	if id == "" {
 		cookie.MaxAge = -1
 	}
-	// Secure cannot be required on the current HTTP-only loopback deployment.
-	// Network listeners remain forbidden; HTTPS deployment must revisit this.
+	// HTTPS uses a __Host- cookie to prevent insecure/subdomain cookie injection.
 	http.SetCookie(w, cookie)
 }

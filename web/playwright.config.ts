@@ -7,6 +7,8 @@ export default defineConfig({
   use: { browserName: 'chromium', trace: 'off' },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1365, height: 1000 } } },
+    { name: 'https-desktop', use: { viewport: { width: 1365, height: 1000 }, ignoreHTTPSErrors: true } },
+    { name: 'https-mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ignoreHTTPSErrors: true } },
     { name: 'mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
   ],
 });

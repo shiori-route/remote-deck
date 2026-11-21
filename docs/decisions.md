@@ -63,3 +63,23 @@ The current HTTP loopback cookie is not Secure and cookies are not port-isolated
 This assumes trusted local services; it must not be generalized to a remote or
 multi-user deployment without a dedicated HTTPS-origin design. An unpatched
 picomatch issue in trusted-input build tooling is recorded in security.md.
+
+## D008 — Explicit direct TLS for a single remote operator
+
+Keep the default loopback HTTP workflow. Require origin, certificate and private
+key together before enabling an IPv4 network listener. Terminate TLS in Go using
+the standard library, minimum TLS 1.2; no runtime dependency or proxy trust chain.
+Use exact configured origin/Host and actual connection scheme, ignoring forwarded
+headers. Validate certificate hostname/dates/server usage and private key safety
+before storage startup. Certificates are operator-provisioned and loaded once.
+
+HTTPS uses a distinct __Host- prefixed Secure cookie, Path=/, while retaining
+HttpOnly, SameSite, bounded sessions and CSRF. A global login bucket bounds burst
+work without storing arbitrary client addresses. It can be exhausted by hostile
+clients; private-network/VPN restrictions are still expected. There is one full-
+authority operator token, not multi-user identity or Internet DoS resistance.
+
+D008 supersedes D005–D007's temporary loopback-only restriction. No actual public
+exposure, DNS/firewall/VPN changes, ACME, proxy termination or deployment daemon is
+part of this step. Next implement systemd/cgroup ownership and crash tests before
+adding general task providers.

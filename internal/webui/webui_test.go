@@ -8,7 +8,7 @@ import (
 )
 
 func TestEmbeddedConsoleAndSecurityHeaders(t *testing.T) {
-	h := Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(401) }), "127.0.0.1:8080")
+	h := Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(401) }), "http://127.0.0.1:8080")
 	for _, tc := range []struct {
 		method, path string
 		status       int

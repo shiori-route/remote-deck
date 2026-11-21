@@ -1,13 +1,13 @@
 # Security model
 
-Status: local service with operator bearer authentication and browser sessions.
+Status: operator bearer authentication, browser sessions and optional direct TLS.
 See progress for implementation and test evidence.
 
 The service trusts its OS identity and anyone possessing its operator token.
-Other local callers must authenticate. Bind only to `127.0.0.1`; reject
-non-loopback bind configuration. Do not proxy this API to a network, including a
-private network, until TLS and remote-access behavior are designed and tested.
-Exact listener Host checks, cross-origin/Fetch Metadata rejection and strict JSON POSTs are additional
+Other callers must authenticate. HTTP binds only to `127.0.0.1`. Non-loopback
+IPv4 requires explicit HTTPS origin, certificate and private key. The intended
+remote scope is one operator on a private network/VPN with restricted ingress.
+Exact origin/transport/Host checks, cross-origin/Fetch Metadata rejection and strict JSON POSTs are additional
 barriers in addition to bearer authentication.
 
 ## Operator token
@@ -31,8 +31,8 @@ this local credential is not an OAuth server or a claim of full OAuth compliance
 The token has full API authority, no automatic expiry and no individual user
 attribution or roles. It is loaded once at startup; changing the file does not
 revoke a running service's in-memory credential. See deployment for rotation.
-The raw credential is stored locally and travels over loopback HTTP; TLS is
-required before extending access to a network. No attempt is made to isolate
+The raw credential is stored locally and travels over loopback HTTP or direct
+TLS. Network HTTP and TLS-terminating proxies are not supported. No attempt is made to isolate
 credentials from processes running as the same OS user.
 
 ## Browser sessions and CSRF
@@ -43,14 +43,17 @@ the map key. The bounded map permits 64 sessions, each with an absolute 8-hour
 expiry. Logout deletes the entry; reauthentication rotates it; restart revokes all.
 No browser sessions are persisted in SQLite.
 
-Cookies are HttpOnly, SameSite=Strict, host-only and scoped to /api/v1. Secure is
-not set for loopback HTTP and must be revisited for HTTPS deployment. Cookie writes
+Cookies are HttpOnly, SameSite=Strict and host-only. Loopback HTTP uses
+`remotedeck_session` scoped to /api/v1 without Secure. HTTPS uses
+`__Host-remotedeck_session`, Secure and Path=/; this prefix blocks insecure or
+subdomain-set cookies with that name in conforming browsers. Only the cookie name
+for the actual transport is accepted, including for logout. Cookie writes
 require exact Origin plus a matching CSRF header. Session-info GET restores the
 CSRF token on reload. Operator tokens are cleared after login attempts and never
 saved in localStorage/sessionStorage. Invalid explicit bearer headers cannot fall
 back to cookies. Job data and log output are rendered as text, never HTML.
 
-Host validation includes the listener port; cross-origin and same-site requests
+Host validation includes the configured origin port; cross-origin and same-site requests
 are rejected. The console has restrictive CSP, frame-ancestors 'none', no-referrer,
 nosniff and no-store. No third-party assets/scripts load. The CSRF approach follows
 [OWASP's synchronizer-token guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
@@ -58,8 +61,12 @@ nosniff and no-store. No third-party assets/scripts load. The CSRF approach foll
 Cookies are not isolated by TCP port. Another untrusted service on 127.0.0.1 can
 receive host cookies if a browser visits a matching path there; Origin/CSRF checks
 do not fix that browser limitation. This local console assumes trusted loopback
-services. Remote/multi-user deployment needs a dedicated HTTPS origin and must
-revisit cookies, login rate limits and identity. Logout does not roll back requests
+services. HTTPS also requires a dedicated host without untrusted sibling-port
+services. Login has a process-wide 10-attempt burst and one-attempt/second refill,
+returning 429 on exhaustion. Its fixed memory avoids attacker-driven IP maps; it
+also allows a hostile client to delay other logins. It does not rate-limit TLS
+handshakes or existing authenticated API use and is not Internet DoS protection.
+Multi-user identity is not implemented. Logout does not roll back requests
 that were already authorized and in flight.
 
 The only initial task is `/usr/bin/uname -a`. Use absolute executable paths,
@@ -87,9 +94,29 @@ sandbox: descendants can escape groups. Hard crashes can leave children running.
 General-purpose commands and Codex require stronger isolation and supervision.
 Never treat startup database reconciliation as proof of process termination.
 
-TLS termination, multi-user authorization and secrets management are not implemented.
+Direct TLS is implemented; proxy termination, multi-user authorization and
+managed secrets/certificate provisioning are not implemented.
 Log reads require the same credentials as task results.
 Errors returned to clients omit host paths, SQL details and environment values.
+
+## TLS boundary
+
+Go terminates TLS directly, with minimum TLS 1.2 and standard-library cipher
+selection. Startup verifies key pairing, leaf hostname, validity dates and server
+EKU. Private keys must be owned, regular, mode 0600, single-linked and at most
+1 MiB; symlink keys are refused. Operators protect parent directories and renew
+certificates before expiry. Startup does not establish client CA trust or validate
+all intermediate policies; clients perform full chain verification.
+
+Host and scheme are checked against the exact configured origin. Scheme comes
+from the actual Go TLS connection; Forwarded/X-Forwarded-* never grant trust.
+Plaintext on the TLS port cannot reach application routes. No redirect listener,
+ACME service or automatic certificate reload is added. Changing files requires a
+restart. Restrict network reachability and use a client-trusted certificate as
+specified in [deployment](deployment.md#direct-https-access).
+
+References: [Go TLS configuration](https://pkg.go.dev/crypto/tls#Config),
+[MDN cookie attributes and prefixes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie).
 
 ## Frontend build dependency audit
 

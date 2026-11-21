@@ -24,19 +24,59 @@ type Session struct {
 
 // Sessions is bounded and process-local. Restart revokes all browser sessions.
 type Sessions struct {
-	mu      sync.Mutex
-	entries map[[sha256.Size]byte]Session
-	origin  string
-	now     func() time.Time
+	mu          sync.Mutex
+	entries     map[[sha256.Size]byte]Session
+	origin      string
+	now         func() time.Time
+	loginTokens float64
+	loginLast   time.Time
 }
 
 func NewSessions(origin string) *Sessions {
-	return &Sessions{entries: make(map[[sha256.Size]byte]Session), origin: origin, now: time.Now}
+	return &Sessions{entries: make(map[[sha256.Size]byte]Session), origin: origin, now: time.Now, loginTokens: 10, loginLast: time.Now()}
 }
 
 func (s *Sessions) SameOrigin(r *http.Request) bool {
 	values := r.Header.Values("Origin")
-	return s != nil && len(values) == 1 && values[0] == s.origin && "http://"+r.Host == s.origin
+	return s != nil && len(values) == 1 && values[0] == s.origin && s.MatchesRequest(r)
+}
+
+// RequestOrigin uses the actual transport, never proxy-supplied headers.
+func RequestOrigin(r *http.Request) string {
+	scheme := "http://"
+	if r.TLS != nil {
+		scheme = "https://"
+	}
+	return scheme + r.Host
+}
+
+func (s *Sessions) MatchesRequest(r *http.Request) bool {
+	return s != nil && RequestOrigin(r) == s.origin
+}
+
+// AllowLogin is a process-wide bucket: burst 10, one attempt per second.
+// It bounds login work without trusting client IP/proxy headers or growing a map.
+func (s *Sessions) AllowLogin() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	elapsed := now.Sub(s.loginLast).Seconds()
+	if elapsed > 0 {
+		s.loginTokens = min(10, s.loginTokens+elapsed)
+		s.loginLast = now
+	}
+	if s.loginTokens < 1 {
+		return false
+	}
+	s.loginTokens--
+	return true
+}
+
+func CookieName(r *http.Request) string {
+	if r.TLS != nil {
+		return "__Host-remotedeck_session"
+	}
+	return SessionCookieName
 }
 
 func (s *Sessions) Create(previous string) (string, Session, error) {
@@ -100,7 +140,7 @@ func ValidCSRF(entry Session, headers []string) bool {
 func SessionID(r *http.Request) string {
 	id := ""
 	for _, cookie := range r.Cookies() {
-		if cookie.Name == SessionCookieName {
+		if cookie.Name == CookieName(r) {
 			if id != "" || !validToken(cookie.Value) {
 				return ""
 			}

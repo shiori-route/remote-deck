@@ -1,9 +1,11 @@
 # Development progress
 
 Current status: the local HTTP vertical slice, operator bearer authentication,
-browser sessions/CSRF and responsive Svelte console are implemented and tested.
+browser sessions/CSRF, responsive Svelte console and optional direct HTTPS are
+implemented and tested.
 The original slice passed independent reviews; later authentication/UI steps
-received self-review. Protected remote HTTPS deployment is still future work.
+received self-review. HTTPS is tested locally; real DNS/VPN/firewall/certificate
+provisioning and external-device acceptance remain deployment work.
 
 ## Repository baseline
 
@@ -189,3 +191,34 @@ received self-review. Protected remote HTTPS deployment is still future work.
   (cookies are not port-isolated), no remote access, no roles, SSE, cancellation
   UI or general task providers. Go build/test requires generated frontend assets.
 - Next step: design protected HTTPS remote access before enabling network clients.
+
+## Step 6c — Explicit direct HTTPS access
+
+- Baseline: `ee28ceb`; completed 2026-11-21 with implementation-agent self-review.
+- Added origin/cert/key CLI options and direct Go TLS (minimum 1.2). Default HTTP
+  remains 127.0.0.1-only; non-loopback IPv4 requires all TLS settings. Config,
+  certificate hostname/dates/server EKU and private-key safety are checked before
+  storage initialization or listening. No dependency or schema change.
+- Requests must match configured origin/Host and actual TLS transport. Forwarded
+  headers grant no trust. HTTPS uses a separate __Host- Secure/HttpOnly/Strict
+  session cookie with Path=/; CSRF, expiry, logout and CLI bearer behavior remain.
+- Login attempts have a fixed-memory global 10-burst, 1/second bucket. This does
+  not protect TLS handshakes, prevent network DoS or provide multi-user identity.
+- UI displays HTTPS connection mode. Deployment docs cover trusted certificates,
+  dedicated hostname, private-network/VPN ingress, key permissions, rotation and
+  the absence of proxy termination/automatic renewal.
+- Validation: Go ordinary/race/vet checks PASS on Go 1.27.4; frontend type checking
+  (zero errors/warnings), asset build and binary build PASS. Four Chromium E2E
+  projects PASS: HTTP/HTTPS at desktop/mobile sizes, each exercising login,
+  cookies, CSRF, submission, persisted output, pagination, logs and logout.
+- Real TLS integration uses a trusted test CA without bypassing verification and
+  exercises login/CSRF/task/log/logout/bearer. Unknown CA, TLS 1.0/1.1, wrong Host,
+  spoofed forwarded headers, cross-origin and plaintext are refused. Invalid TLS
+  startup settings leave storage untouched. Login bucket refill/exhaustion tested.
+- Browser self-signed fixture bypass is restricted to test projects; it is not a
+  deployment recommendation. HTTPS mobile screenshot inspected. No actual remote
+  DNS/VPN/firewall, production certificate or external-device test was performed.
+- Self-review: PASS; [report](reviews/step-06c-https.md). No service left running,
+  no ports exposed, no push/deployment. Earlier build-tool audit limitation remains
+  recorded; dependencies were not changed or re-audited in this step.
+- Next: systemd/cgroup supervision and crash cleanup tests before general providers.

@@ -9,7 +9,7 @@ durable queue, not a second in-memory queue. The worker polls for queued jobs;
 submission does not depend on a notification being delivered.
 
 ```text
-cmd/remotedeck/       configuration, startup, signals, HTTP lifecycle
+cmd/remotedeck/       configuration, startup, signals, HTTP/TLS lifecycle
 internal/service/    private storage, instance lock, server/worker lifecycle
 internal/job/        job model and state invariants
 internal/store/      SQLite schema and transactional operations
